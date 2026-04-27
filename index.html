@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>PDF範囲選択（編集モード付き）</title>
+<link rel="stylesheet" href="./css/styles.css" />
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib/dist/pdf-lib.min.js"></script>
+</head>
+
+<body>
+
+<div id="toolbar">
+  <input type="file" id="fileInput" accept="application/pdf" />
+  <button id="exportBtn">すべて画像化</button>
+  <button id="toPdfModeBtn">pdf化</button>
+  <button id="backToSelectBtn" style="display:none;">範囲選択へ戻る</button>
+  <button id="exportPdfBtn" style="display:none;">書き出し</button>
+</div>
+
+<div id="viewer"></div>
+
+<div id="editorRoot">
+  <aside id="selectionPanel"></aside>
+  <section id="editorCanvasArea">
+    <div id="editorControls">
+      <button id="prevPageBtn">前ページへ</button>
+      <button id="nextPageBtn">次ページへ</button>
+      <label>拡大率 <input id="zoomRange" type="range" min="40" max="200" value="100" /></label>
+      <button id="addPageBtn">新しいページ</button>
+    </div>
+    <div id="dummyPdfViewport">
+      <div id="dummyPdfInner"></div>
+    </div>
+  </section>
+</div>
+
+<div id="busyOverlay" aria-live="polite" aria-busy="false">
+  <div class="busy-content">
+    <div class="spinner" aria-hidden="true"></div>
+    <div id="busyMessage">圧縮中です。しばらくお待ちください…</div>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
