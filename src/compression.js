@@ -1,54 +1,14 @@
 import { OXIPNG_MAX_LEVEL, PNGQUANT_MAX_COLORS } from './constants.js';
+import { optimise } from '@jsquash/oxipng';
 
-let oxipngEncode = null;
 let pngQuantizer = null;
-
-const OXIPNG_MODULE_URL_CANDIDATES = [
-  '../oxipng-wasm/oxipng_wasm.js',
-  'https://esm.sh/oxipng-wasm@0.1.0'
-];
-
-async function getOxipngEncode() {
-  if (oxipngEncode) return oxipngEncode;
-
-  let lastError = null;
-
-  for (const moduleUrl of OXIPNG_MODULE_URL_CANDIDATES) {
-    try {
-      const response = await fetch(moduleUrl);
-
-      if (!response.ok) {
-        throw new Error(`fetch failed: ${response.status}`);
-      }
-
-      let instance;
-
-      if (WebAssembly.instantiateStreaming) {
-        ({ instance } = await WebAssembly.instantiateStreaming(response));
-      } else {
-        const buffer = await response.arrayBuffer();
-        ({ instance } = await WebAssembly.instantiate(buffer));
-      }
-
-      if (!instance.exports || !instance.exports.encode) {
-        throw new Error("encode export が見つかりません");
-      }
-
-      oxipngEncode = instance.exports.encode;
-      return oxipngEncode;
-
-    } catch (err) {
-      lastError = err;
-    }
-  }
-
-  throw lastError ?? new Error("oxipng moduleの読み込みに失敗しました");
-}
 
 async function getPngQuantizer() {
   if (pngQuantizer) return pngQuantizer;
+
   const mod = await import('https://esm.sh/@fe-daily/libimagequant-wasm@0.1.1');
   const LibImageQuant = mod.default;
+
   pngQuantizer = new LibImageQuant();
   return pngQuantizer;
 }
@@ -67,26 +27,34 @@ function canvasToPngBlob(canvas) {
 
 export async function getCompressedPngBytes(canvas) {
   const pngBlob = await canvasToPngBlob(canvas);
-  let quantizedBytes = new Uint8Array(await pngBlob.arrayBuffer());
+  let bytes = new Uint8Array(await pngBlob.arrayBuffer());
 
+  // --- pngquant（任意）
   try {
     const quantizer = await getPngQuantizer();
     const ctx = canvas.getContext('2d');
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const quantizedResult = await quantizer.quantizeImageData(imageData, {
+
+    const result = await quantizer.quantizeImageData(imageData, {
       maxColors: PNGQUANT_MAX_COLORS
     });
-    quantizedBytes = quantizedResult.pngBytes;
+
+    bytes = result.pngBytes;
   } catch (err) {
-    console.warn(`pngquant(最大${PNGQUANT_MAX_COLORS}色)圧縮に失敗したため元PNGを利用します:`, err);
+    console.warn(
+      `pngquant(最大${PNGQUANT_MAX_COLORS}色)圧縮に失敗 → 元PNGを使用`,
+      err
+    );
   }
 
+  // --- oxipng（jsquash）
   try {
-    const encode = await getOxipngEncode();
-    return encode(quantizedBytes, OXIPNG_MAX_LEVEL);
+    return await optimise(bytes, {
+      level: OXIPNG_MAX_LEVEL
+    });
   } catch (err) {
-    console.warn('oxipng圧縮に失敗したためpngquant結果を利用します:', err);
-    return quantizedBytes;
+    console.warn('oxipng圧縮に失敗 → pngquant結果を使用', err);
+    return bytes;
   }
 }
 

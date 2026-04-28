@@ -12,6 +12,8 @@
     "vite": "^8.0.10"
   },
   "dependencies": {
-    "@wasm-codecs/oxipng": "^1.0.1"
+    "@jsquash/oxipng": "^2.3.0",
+    "@wasm-codecs/oxipng": "^1.0.1",
+    "esbuild": "^0.28.0"
   }
 }
