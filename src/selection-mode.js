@@ -82,47 +82,53 @@ function setEditMode(target) {
   interact(target.el).resizable({ enabled: true });
 }
 
-export async function loadPdfFile(file) {
-  if (!file) return;
+export async function loadPdfFile(files) {
+  if (!files || files.length === 0) return;
 
   if (state.pages.length > 0) {
     setSelectModeUI();
   }
-
-  const buf = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
 
   dom.viewer.innerHTML = '';
   dom.selectionPanel.innerHTML = '';
   dom.dummyPdfInner.innerHTML = '';
   resetDocumentState();
 
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const viewport = page.getViewport({ scale: DPI_SCALE });
+  for (let fIdx = 0; fIdx < files.length; fIdx++) {
+    const file = files[fIdx];
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
 
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    canvas.style.width = `${viewport.width / DPI_SCALE}px`;
-    canvas.style.height = `${viewport.height / DPI_SCALE}px`;
+    state.files.push({ name: file.name, numPages: pdf.numPages });
 
-    await page.render({ canvasContext: ctx, viewport }).promise;
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: DPI_SCALE });
 
-    const wrapper = document.createElement('div');
-    wrapper.className = 'page';
-    wrapper.style.width = canvas.style.width;
-    wrapper.style.height = canvas.style.height;
-    wrapper.appendChild(canvas);
-    dom.viewer.appendChild(wrapper);
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      canvas.style.width = `${viewport.width / DPI_SCALE}px`;
+      canvas.style.height = `${viewport.height / DPI_SCALE}px`;
 
-    state.pages.push({
-      canvas,
-      wrapper,
-      displayWidth: viewport.width / DPI_SCALE,
-      displayHeight: viewport.height / DPI_SCALE
-    });
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'page';
+      wrapper.style.width = canvas.style.width;
+      wrapper.style.height = canvas.style.height;
+      wrapper.appendChild(canvas);
+      dom.viewer.appendChild(wrapper);
+
+      state.pages.push({
+        canvas,
+        wrapper,
+        displayWidth: viewport.width / DPI_SCALE,
+        displayHeight: viewport.height / DPI_SCALE,
+        fileIndex: fIdx
+      });
+    }
   }
 
   setSelectModeUI();
@@ -265,7 +271,8 @@ export async function buildSelectionsFromOverlays() {
       url: bytesToDataUrl(compressedPng),
       width: out.width,
       height: out.height,
-      variantNo: null
+      variantNo: null,
+      fileIndex: page.fileIndex
     });
   }
 
