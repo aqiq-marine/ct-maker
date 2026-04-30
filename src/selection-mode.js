@@ -92,6 +92,7 @@ export async function loadPdfFile(files) {
   dom.viewer.innerHTML = '';
   dom.selectionPanel.innerHTML = '';
   dom.dummyPdfInner.innerHTML = '';
+  dom.pdfList.innerHTML = '';
   resetDocumentState();
 
   for (let fIdx = 0; fIdx < files.length; fIdx++) {
@@ -99,7 +100,17 @@ export async function loadPdfFile(files) {
     const buf = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
 
-    state.files.push({ name: file.name, numPages: pdf.numPages });
+    state.files.push({ name: file.name, numPages: pdf.numPages, startPageIndex: state.pages.length });
+
+    // Render sidebar item
+    const item = document.createElement('div');
+    item.className = 'pdf-list-item';
+    item.textContent = file.name;
+    item.addEventListener('click', () => {
+      const targetPage = state.pages.find(p => p.fileIndex === fIdx);
+      if (targetPage) targetPage.wrapper.scrollIntoView({ behavior: 'smooth' });
+    });
+    dom.pdfList.appendChild(item);
 
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
@@ -131,7 +142,29 @@ export async function loadPdfFile(files) {
     }
   }
 
+  // Setup scroll listener to update active PDF
+  dom.viewer.addEventListener('scroll', updateActivePdf);
+
   setSelectModeUI();
+}
+
+function updateActivePdf() {
+  const rects = state.pages.map(p => p.wrapper.getBoundingClientRect());
+  const viewerRect = dom.viewer.getBoundingClientRect();
+  const midPoint = viewerRect.top + viewerRect.height / 2;
+
+  let activeIndex = 0;
+  for (let i = 0; i < rects.length; i++) {
+    if (rects[i].top <= midPoint && rects[i].bottom >= midPoint) {
+      activeIndex = state.pages[i].fileIndex;
+      break;
+    }
+  }
+
+  const items = dom.pdfList.querySelectorAll('.pdf-list-item');
+  items.forEach((el, i) => {
+    el.classList.toggle('active', i === activeIndex);
+  });
 }
 
 export function setupSelectionEvents() {
@@ -237,14 +270,14 @@ export async function exportSelectionsToZip() {
 export async function buildSelectionsFromOverlays() {
   state.extractedSelections = [];
 
-  for (const [idx, overlay] of state.overlays.entries()) {
+  const tasks = state.overlays.map(async (overlay, idx) => {
     const page = state.pages.find((p) => p.wrapper === overlay.wrapper);
-    if (!page) continue;
+    if (!page) return null;
 
     const { scaleX, scaleY } = getCanvasScale(page);
     const w = overlay.el.offsetWidth;
     const h = overlay.el.offsetHeight;
-    if (w <= 0 || h <= 0) continue;
+    if (w <= 0 || h <= 0) return null;
 
     const out = document.createElement('canvas');
     out.width = Math.max(1, Math.round(w * scaleX));
@@ -263,7 +296,7 @@ export async function buildSelectionsFromOverlays() {
     );
 
     const compressedPng = await getCompressedPngBytes(out);
-    state.extractedSelections.push({
+    return {
       id: `sel_${idx}`,
       name: `画像${idx + 1}`,
       baseName: `画像${idx + 1}`,
@@ -273,8 +306,11 @@ export async function buildSelectionsFromOverlays() {
       height: out.height,
       variantNo: null,
       fileIndex: page.fileIndex
-    });
-  }
+    };
+  });
+
+  state.extractedSelections = (await Promise.all(tasks)).filter(Boolean);
+
 
   state.availableSelectionIds = new Set(state.extractedSelections.map((selection) => selection.id));
 }

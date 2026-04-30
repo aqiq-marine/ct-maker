@@ -36,9 +36,46 @@ canvas {
   border: 2px solid blue;
 }
 
+#selectionRoot {
+  display: flex;
+  height: calc(100vh - 50px);
+}
+
+#pdfSidebar {
+  width: 200px;
+  border-right: 1px solid #ddd;
+  background: #fdfdfd;
+  overflow-y: auto;
+  padding: 10px;
+  display: block;
+}
+
+.pdf-list-item {
+  padding: 8px;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+  font-size: 13px;
+  padding-right: 10px;
+}
+
+.pdf-list-item:hover {
+  background: #f0f0f0;
+}
+
+.pdf-list-item.active {
+  background: #e0e0ff;
+  font-weight: bold;
+}
+
+#viewer {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
 #editorRoot {
   display: none;
-  height: calc(100vh - 70px);
+  height: calc(100vh - 50px);
 }
 
 #selectionPanel {
